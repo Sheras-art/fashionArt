@@ -1,6 +1,6 @@
 import mongoose, { Schema } from "mongoose";
 import bcrypt from "bcrypt";
-import { jwt } from "jsonwebtoken";
+import jwt from "jsonwebtoken";
 
 const userSchema = new Schema(
   {
@@ -36,11 +36,12 @@ const userSchema = new Schema(
     role: {
       type: String,
       required: true,
-      enum: ["user", "admin"],
+      enum: ["user", "admin", "owner"],
+      default: "user"
     },
     isActive: {
       type: Boolean,
-      required: true,
+      default: true
     },
     refreshToken: {
       type: String,
@@ -50,12 +51,11 @@ const userSchema = new Schema(
   { timestamps: true }
 );
 
-userSchema.pre("save", async function (next) {
+userSchema.pre("save", async function () {
   // checking if password is not modified then we return no need to perform any action like (hashing).
-  if (!this.isModified("password")) return next();
+  if (!this.isModified("password")) return null;
   // and if password is modified or new then we will hash the password first then save it in DB.
   this.password = await bcrypt.hash(this.password, 10);
-  next();
 });
 
 userSchema.methods.isPasswordCorrect = async function (password) {
@@ -69,6 +69,7 @@ userSchema.methods.generateAccessToken = async function () {
       email: this.email,
       fullName: this.fullName,
       username: this.username,
+      role: this.role
     },
     process.env.ACCESS_TOKEN_SECRET,
     {
