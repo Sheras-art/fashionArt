@@ -1,12 +1,14 @@
 import mongoose, { Schema } from "mongoose";
+import bcrypt from "bcrypt";
+import { jwt } from "jsonwebtoken";
 
 const userSchema = new Schema(
   {
-    username: {
+    userName: {
       type: String,
-      required: false,
+      required: true,
       unique: true,
-      lowercase: true
+      lowercase: true,
     },
     fullName: {
       type: String,
@@ -21,7 +23,7 @@ const userSchema = new Schema(
     },
     isEmailVerified: {
       type: Boolean,
-      default: false
+      default: false,
     },
     phoneNumber: {
       type: String,
@@ -34,14 +36,57 @@ const userSchema = new Schema(
     role: {
       type: String,
       required: true,
-      enum: ["user", "admin"]
+      enum: ["user", "admin"],
     },
     isActive: {
       type: Boolean,
       required: true,
+    },
+    refreshToken: {
+      type: String,
+      
     }
   },
   { timestamps: true }
 );
+
+userSchema.pre("save", async function (next) {
+  // checking if password is not modified then we return no need to perform any action like (hashing).
+  if (!this.isModified("password")) return next();
+  // and if password is modified or new then we will hash the password first then save it in DB.
+  this.password = await bcrypt.hash(this.password, 10);
+  next();
+});
+
+userSchema.methods.isPasswordCorrect = async function (password) {
+  return bcrypt.compare(password, this.password);
+};
+
+userSchema.methods.generateAccessToken = async function () {
+  return jwt.sign(
+    {
+      _id: this._id,
+      email: this.email,
+      fullName: this.fullName,
+      username: this.username,
+    },
+    process.env.ACCESS_TOKEN_SECRET,
+    {
+      expiresIn: process.env.ACCESS_TOKEN_EXPIRY,
+    }
+  );
+};
+
+userSchema.methods.generateRefreshToken = async function () {
+  return jwt.sign(
+    {
+      _id: this.id,
+    },
+    process.env.REFRESH_TOKEN_SECRET,
+    {
+      expiresIn: process.env.REFRESH_TOKEN_EXPIRY,
+    }
+  );
+};
 
 export const User = mongoose.model("User", userSchema);
