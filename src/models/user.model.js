@@ -33,6 +33,12 @@ const userSchema = new Schema(
       type: String,
       required: true,
     },
+    Addresses: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Address"
+      }
+    ],
     role: {
       type: String,
       required: true,
@@ -45,7 +51,6 @@ const userSchema = new Schema(
     },
     refreshToken: {
       type: String,
-      
     }
   },
   { timestamps: true }
@@ -53,7 +58,7 @@ const userSchema = new Schema(
 
 userSchema.pre("save", async function () {
   // checking if password is not modified then we return no need to perform any action like (hashing).
-  if (!this.isModified("password")) return null;
+  if (!this.isModified("password")) return ;
   // and if password is modified or new then we will hash the password first then save it in DB.
   this.password = await bcrypt.hash(this.password, 10);
 });
@@ -68,7 +73,7 @@ userSchema.methods.generateAccessToken = async function () {
       _id: this._id,
       email: this.email,
       fullName: this.fullName,
-      username: this.username,
+      userName: this.userName,
       role: this.role
     },
     process.env.ACCESS_TOKEN_SECRET,
@@ -81,7 +86,7 @@ userSchema.methods.generateAccessToken = async function () {
 userSchema.methods.generateRefreshToken = async function () {
   return jwt.sign(
     {
-      _id: this.id,
+      _id: this._id,
     },
     process.env.REFRESH_TOKEN_SECRET,
     {
