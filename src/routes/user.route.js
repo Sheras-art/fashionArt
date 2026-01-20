@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { 
     addUserAddress, 
+    assignUserRole, 
     changeUserPassword, 
     deleteUserAddress, 
     editUserDetails, 
@@ -10,8 +11,12 @@ import {
     logOutUser, 
     registerUser, 
     setDefaultUserAddress, 
+    transferOwnership, 
     updateUserAddress } from "../controllers/user.controller.js";
 import { verifyJWT } from "../middlerwares/auth.middleware.js";
+import authorizeRoles from "../middlerwares/authorizeRoles.js";
+import { createProduct } from "../controllers/product.controller.js";
+import { upload } from "../middlerwares/multer.js";
 
 const userRouter = Router();
 
@@ -30,5 +35,7 @@ userRouter.route("/delete-user-address").post(verifyJWT, deleteUserAddress);
 userRouter.route("/user-addresses").post(verifyJWT, getUserAddresses);
 userRouter.route("/update-user-address").post(verifyJWT, updateUserAddress);
 userRouter.route("/set-default-user-address").post(verifyJWT, setDefaultUserAddress);
+userRouter.route("/assign-user-role").post(verifyJWT, authorizeRoles("owner"), assignUserRole);
+userRouter.route("/transfer-ownership").post(verifyJWT, authorizeRoles("owner"), transferOwnership);
 
 export { userRouter }

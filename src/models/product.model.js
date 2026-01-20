@@ -21,10 +21,13 @@ const productSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
-  image: [
+  coverImage: {
+    type: String,
+    required: true
+  },
+  images: [
     { 
         type: String,
-         required: true 
     }
   ],
   isActive: {

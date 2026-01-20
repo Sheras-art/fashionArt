@@ -101,8 +101,14 @@ const loginUser = asyncHandler(async (req, res) => {
 
     const { accessToken, refreshToken } = await generateAccessAndRefreshToken(user._id);
 
+    await User.findByIdAndUpdate(user._id, {
+        $set: { isActive: true }
+    });
+
     const loggedInUser = await User.findById(user._id)
         .select("-password -refreshToken");
+
+
 
     const options = {
         httpOnly: true,
@@ -125,7 +131,8 @@ const logOutUser = asyncHandler(async (req, res) => {
     const user = req.user;
 
     const updatedUser = await User.findByIdAndUpdate(user._id, {
-        $unset: { refreshToken: 1 }
+        $unset: { refreshToken: 1 },
+        $set: { isActive: false }
     });
 
     const options = {
@@ -396,7 +403,7 @@ const deleteUserAddress = asyncHandler(async (req, res) => {
     await Address.findOneAndDelete({ _id: _id, user: userId });
 
     await User.findByIdAndUpdate(userId, {
-        $pull: {Addresses: existingAddress._id}
+        $pull: { Addresses: existingAddress._id }
     });
 
     res.status(200)
@@ -412,7 +419,112 @@ const getUserAddresses = asyncHandler(async (req, res) => {
 
     return res.status(200)
         .json(new apiResponse(200, user.Addresses, "User addresses fetched successfully"))
-})
+});
+
+const assignUserRole = asyncHandler(async (req, res) => {
+    // assign user role todo's
+
+    // get user id and role
+    // validate user id and role
+    // check if user exist
+    // assign role to user
+    // return response
+
+    const { _id, role } = req.body;
+    
+    if (!_id || !role) {
+        throw new apiError(400, "User id and role are reuired")
+    }
+
+    const existingOwner = await User.findOne({ role: "owner" });
+    if (!existingOwner._id.equals(req.user._id)) {
+        throw new apiError(403, "Only owner can assign roles");
+    }
+
+    const allowedRoles = ["user", "admin", "owner"];
+    if (!allowedRoles.includes(role)) {
+        throw new apiError(400, "Invalid role")
+    }
+    if (role === "owner") {
+        const existingOwner = await User.findOne({ role: "owner" });
+        if (existingOwner) {
+            throw new apiError(409, "Owner already exists");
+        }
+    }
+    if (req.user._id.toString() === _id) {
+        throw new apiError(400, "You cannot change your own role")
+    }
+
+    const user = await User.findById(_id);
+    if (!user) {
+        throw new apiError(404, "User not found")
+    }
+
+    user.role = role;
+    await user.save({ validateBeforeSave: false });
+
+    res.status(200)
+        .json(new apiResponse(200, {}, "User role updated successfully"))
+});
+
+const transferOwnership = asyncHandler(async (req, res) => {
+
+    const { newOwnerId } = req.body;
+
+    if (!newOwnerId) {
+        throw new apiError(400, "New owner ID is required");
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(newOwnerId)) {
+        throw new apiError(400, "Invalid new owner ID");
+    }
+
+    const newOwner = await User.findById(newOwnerId);
+
+    if (!newOwner) {
+        throw new apiError(404, "New owner userId not found");
+    }
+
+    const currentOwner = await User.findOne({ role: "owner" });
+
+    if (!currentOwner) {
+        throw new apiError(404, "Current owner not found");
+    }
+
+    if (!req.user._id.equals(currentOwner._id)) {
+        throw new apiError(403, "You are not the current owner");
+    }
+
+    if (currentOwner._id.equals(newOwner._id)) {
+        throw new apiError(400, "New owner is the same as current owner");
+    }
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+        currentOwner.role = "admin";
+        await currentOwner.save({ session, validateBeforeSave: false });
+
+        newOwner.role = "owner";
+        await newOwner.save({ session, validateBeforeSave: false });
+
+        await session.commitTransaction();
+        session.endSession();
+
+        res.status(200)
+            .json(new apiResponse(200, {}, "Ownership transferred successfully"));
+
+    } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
+        console.error(error);
+        throw new apiError(500, "Something went wrong while transferring ownership");
+
+    } finally {
+        session.endSession();
+    }
+});
 
 export {
     registerUser,
@@ -426,5 +538,7 @@ export {
     updateUserAddress,
     getUserAddresses,
     deleteUserAddress,
-    editUserDetails
+    editUserDetails,
+    assignUserRole,
+    transferOwnership
 };

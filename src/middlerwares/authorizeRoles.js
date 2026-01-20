@@ -1,10 +1,12 @@
-import { apiError } from "../utils/ApiError"
+import { apiError } from "../utils/ApiError.js"
 
-export const authorizeRoles = async(...allowedRoles)=>{
-    return (req, res, next)=>{
+const authorizeRoles = (...allowedRoles)=>{
+    return async(req, res, next)=>{
         if (!allowedRoles.includes(req.user.role)) {
             throw new apiError(404, "Page Not Found")
         }
         next();
     }
 }
+
+export default authorizeRoles;
