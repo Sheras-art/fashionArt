@@ -176,7 +176,7 @@ const deleteProduct = asyncHandler(async (req, res) => {
 
 });
 
-const getProducts = asyncHandler(async (req, res) => {
+const getProductsByPagination = asyncHandler(async (req, res) => {
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 10;
     const skip = (page - 1) * limit;
@@ -191,10 +191,133 @@ const getProducts = asyncHandler(async (req, res) => {
     res.status(200)
         .json(new apiResponse(200, {
             products,
+            filteredProducts: products.length,
             totalProducts,
             currentPage: page
         }, "Products Fetched Successfully"))
 });
 
+const getProductById = asyncHandler(async (req, res) => {
+    const { productId } = req.params;
 
-export { createProduct, updateProduct, deleteProduct, getProducts };
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+        throw new apiError(400, "PRoduct id not Valid!")
+    }
+
+    const product = await Product.findById(productId).populate("owner");
+
+    if (!product) {
+        throw new apiError(400, "Product does not exist")
+    }
+
+    res.status(200)
+        .json(new apiResponse(200, { product }, "Product fetched successfully"))
+});
+
+const getProductsByCategory = asyncHandler(async (req, res) => {
+    const { productCategory } = req.body;
+
+    if (!productCategory) {
+        throw new apiError(400, "Product cateogory required!")
+    }
+
+    const products = await Product.aggregate([
+        {
+            $match: {
+                category: productCategory
+            }
+        },
+        {
+            $lookup: {
+                from: "users",
+                localField: "owner",
+                foreignField: "_id",
+                as: "ownerDetails"
+            }
+        },
+        {
+            $unwind: "$ownerDetails"
+        },
+        {
+            $project: {
+                title: 1,
+                price: 1,
+                description: 1,
+                stock: 1,
+                category: 1,
+                images: 1,
+                coverImage: 1,
+                createdAt: 1,
+                ownerDetails: {
+                    _id: 1,
+                    fullName: 1,
+                    userName: 1,
+                    email: 1
+                }
+            }
+        }
+    ]);
+
+    if (!products.length) {
+        throw new apiError(400, "No products found with this category!")
+    }
+
+    res.status(200)
+        .json(new apiResponse(200, {
+            products,
+            totalFilteredProducts: products.length,
+        }, "Products By Category fetched Successfully"))
+});
+
+const searchProducts = asyncHandler(async (req, res) => {
+    const userInput = String(req.body.userInput || "").trim();
+    const page = req.query.page || 1;
+    const limit = req.query.limit || 10;
+    const skip = (page - 1) * limit;
+
+    if (userInput === "") {
+        throw new apiError(400, "Input cannot be empty")
+    }
+    if (!isNaN(userInput) || userInput === 0) {
+        throw new apiError(400, "Input cannot be a Number")
+    }
+
+    const products = await Product.aggregate([
+        {
+            $match: {
+                $text: { $search: userInput.toLowerCase() }
+            }
+
+        },
+        {
+            $addFields: {
+                score: { $meta: "textScore" }
+            }
+        },
+        {
+            $sort: { score: -1 }
+        },
+        { $skip: skip },
+        { $limit: limit }
+    ]);
+
+    if (!products.length) {
+        throw new apiError(400, "Products Not Found with this Keyword")
+    }
+
+    res.status(200)
+        .json(new apiResponse(200, { 
+            products, 
+            searchedProductsCount: products.length 
+        }, "Searched Products Fetched Successfully"))
+});
+
+export {
+    createProduct,
+    updateProduct,
+    deleteProduct,
+    getProductsByPagination,
+    getProductById,
+    getProductsByCategory,
+    searchProducts
+};
