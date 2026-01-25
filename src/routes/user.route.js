@@ -15,13 +15,10 @@ import {
     updateUserAddress } from "../controllers/user.controller.js";
 import { verifyJWT } from "../middlerwares/auth.middleware.js";
 import authorizeRoles from "../middlerwares/authorizeRoles.js";
-import { createProduct } from "../controllers/product.controller.js";
-import { upload } from "../middlerwares/multer.js";
 
 const userRouter = Router();
 
 userRouter.route("/register").post(registerUser);
-
 userRouter.route("/login").post(loginUser);
 
 // Secured routes for user can be added here

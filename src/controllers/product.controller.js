@@ -3,6 +3,8 @@ import { apiError } from "../utils/ApiError.js";
 import { apiResponse } from "../utils/ApiResponse.js";
 import { Product } from "../models/product.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import mongoose from "mongoose";
+import { User } from "../models/user.model.js";
 
 const createProduct = asyncHandler(async (req, res) => {
 
@@ -19,8 +21,13 @@ const createProduct = asyncHandler(async (req, res) => {
 
     const { title, category, price, description, stock } = req.body;
 
-    if (!["admin", "owner"].includes(req.user.role)) {
-        throw new apiError(403, "Only admin and owner can create products");
+    const ownerInDB = User.findOne({
+        _id: req.user._id,
+        role: { $in: ["owner", "admin"] }
+    });
+
+    if (!ownerInDB) {
+        throw new apiError(400, "Only Owner and Admin can create Product")
     }
 
     if (!title || !category || !description) {
@@ -62,6 +69,8 @@ const createProduct = asyncHandler(async (req, res) => {
 
     const imagesURLs = imagesOnCloudinary.map((img) => img?.url);
 
+    // check the req sender is owner in db or not
+
     const product = await Product.create({
         title,
         category,
@@ -69,10 +78,13 @@ const createProduct = asyncHandler(async (req, res) => {
         description,
         stock,
         images: imagesURLs,
-        coverImage: coverImageOnCloudinary?.url
+        coverImage: coverImageOnCloudinary?.url,
+        owner: req.user._id
     });
 
     res.status(201).json(new apiResponse(201, { product }, "Product created successfully"));
+    console.log(product, "Product Created Successfully");
+
 
 });
 
@@ -135,6 +147,54 @@ const updateProduct = asyncHandler(async (req, res) => {
     });
 
     res.status(200).json(new apiResponse(200, { product: updateProduct }, "Product updated successfully"));
+
+    console.log(updateProduct, "Product Updated Successfully");
+
 });
 
-export { createProduct, updateProduct };
+const deleteProduct = asyncHandler(async (req, res) => {
+
+    const { productId } = req.params;
+
+    if (!productId) {
+        throw new apiError(400, "Product Id Required");
+    }
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+        throw new apiError(400, "InValid Product Id")
+    }
+
+    const product = await Product.findByIdAndDelete(productId);
+
+    if (!product) {
+        throw new apiError(400, "Product not exist or already deleted")
+    }
+
+    res.status(200)
+        .json(new apiResponse(200, { product }, "Product Deleted Successfully"))
+
+    console.log(product, "Product Deleted Successfully");
+
+});
+
+const getProducts = asyncHandler(async (req, res) => {
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const products = await Product.find({})
+        .skip(skip)
+        .limit(limit)
+        .sort({ createdAt: -1 });
+
+    const totalProducts = await Product.countDocuments();
+
+    res.status(200)
+        .json(new apiResponse(200, {
+            products,
+            totalProducts,
+            currentPage: page
+        }, "Products Fetched Successfully"))
+});
+
+
+export { createProduct, updateProduct, deleteProduct, getProducts };

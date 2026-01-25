@@ -36,10 +36,7 @@ const registerUser = asyncHandler(async (req, res) => {
     // check for user creation
     // return resonse
 
-    console.log(req.body);
     const { fullName, userName, email, password, phoneNumber } = req.body;
-
-
 
     if ([fullName, userName, email, password].some((field) => field?.trim() === "")) {
         throw new apiError(400, "All fields are required")
@@ -412,7 +409,7 @@ const deleteUserAddress = asyncHandler(async (req, res) => {
 
 const getUserAddresses = asyncHandler(async (req, res) => {
 
-    const user = await User.findById(req.user._id).populate("Addresses");
+    const user = await User.findById(req.user._id)?.populate("Addresses");
     if (!user) {
         throw new apiError(404, "User not found");
     }
@@ -430,14 +427,15 @@ const assignUserRole = asyncHandler(async (req, res) => {
     // assign role to user
     // return response
 
-    const { _id, role } = req.body;
-    
-    if (!_id || !role) {
-        throw new apiError(400, "User id and role are reuired")
+    const { email, role } = req.body;
+
+    if (!email || !role) {
+        throw new apiError(400, "User email and role are required")
     }
 
-    const existingOwner = await User.findOne({ role: "owner" });
-    if (!existingOwner._id.equals(req.user._id)) {
+    const OwnerUser = await User.findOne({ role: "owner" });
+
+    if (!OwnerUser || !OwnerUser._id.equals(req.user._id)) {
         throw new apiError(403, "Only owner can assign roles");
     }
 
@@ -446,18 +444,16 @@ const assignUserRole = asyncHandler(async (req, res) => {
         throw new apiError(400, "Invalid role")
     }
     if (role === "owner") {
-        const existingOwner = await User.findOne({ role: "owner" });
-        if (existingOwner) {
-            throw new apiError(409, "Owner already exists");
-        }
-    }
-    if (req.user._id.toString() === _id) {
-        throw new apiError(400, "You cannot change your own role")
+        throw new apiError(409, "Owner role cannot be reassigned directly");
     }
 
-    const user = await User.findById(_id);
+    const user = await User.findOne({ email: email });
     if (!user) {
         throw new apiError(404, "User not found")
+    }
+
+    if (req.user._id.equals(user._id)) {
+        throw new apiError(400, "You cannot change your own role")
     }
 
     user.role = role;
@@ -469,20 +465,15 @@ const assignUserRole = asyncHandler(async (req, res) => {
 
 const transferOwnership = asyncHandler(async (req, res) => {
 
-    const { newOwnerId } = req.body;
+    const { newOwnerEmail } = req.body;
 
-    if (!newOwnerId) {
-        throw new apiError(400, "New owner ID is required");
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(newOwnerId)) {
-        throw new apiError(400, "Invalid new owner ID");
-    }
-
-    const newOwner = await User.findById(newOwnerId);
-
+    const newOwner = await User.findOne({email: newOwnerEmail});
     if (!newOwner) {
-        throw new apiError(404, "New owner userId not found");
+        throw new apiError(400, "User not Found");
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(newOwner._id)) {
+        throw new apiError(400, "Invalid new owner ID");
     }
 
     const currentOwner = await User.findOne({ role: "owner" });

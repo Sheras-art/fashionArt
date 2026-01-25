@@ -1,6 +1,11 @@
 import mongoose from "mongoose";
 
 const productSchema = new mongoose.Schema({
+  owner: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true
+  },
   title: {
     type: String,
     required: true,
@@ -26,8 +31,8 @@ const productSchema = new mongoose.Schema({
     required: true
   },
   images: [
-    { 
-        type: String,
+    {
+      type: String,
     }
   ],
   isActive: {
@@ -41,6 +46,6 @@ const productSchema = new mongoose.Schema({
     min: 0,
     max: 5
   }
-}, {timestamps: true});
+}, { timestamps: true });
 
 export const Product = mongoose.model("Product", productSchema);
