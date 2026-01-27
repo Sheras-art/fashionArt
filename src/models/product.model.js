@@ -49,5 +49,6 @@ const productSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 productSchema.index({ title: "text", description: "text" });
+productSchema.index({ isActive: 1, buyCount: -1 });
 
 export const Product = mongoose.model("Product", productSchema);

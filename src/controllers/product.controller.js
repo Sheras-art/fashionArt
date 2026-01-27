@@ -287,7 +287,6 @@ const searchProducts = asyncHandler(async (req, res) => {
             $match: {
                 $text: { $search: userInput.toLowerCase() }
             }
-
         },
         {
             $addFields: {
@@ -306,10 +305,117 @@ const searchProducts = asyncHandler(async (req, res) => {
     }
 
     res.status(200)
-        .json(new apiResponse(200, { 
-            products, 
-            searchedProductsCount: products.length 
+        .json(new apiResponse(200, {
+            products,
+            searchedProductsCount: products.length
         }, "Searched Products Fetched Successfully"))
+});
+
+const getNewArrivals = asyncHandler(async (req, res) => {
+
+    const limit = req.query.limit || 10;
+
+    const products = await Product.aggregate([
+        {
+            $match: {
+                isActive: true
+            }
+        }, {
+            $sort: { createdAt: -1 }
+        },
+        {
+            $limit: limit
+        },
+
+    ])
+
+    res.status(200)
+        .json(new apiResponse(200, {
+            products,
+            newArrivalsCount: products.length
+        }, "New Arrivals Products Fetched"))
+});
+
+const getBestSellers = asyncHandler(async (req, res) => {
+    const limit = Number(req.query.limit) || 10;
+
+    const products = await Product.aggregate([
+        {
+            $match: {
+                isActive: true,
+                buyCount: { $gt: 0 }
+            }
+        },
+        {
+            $sort: { buyCount: -1 }
+        },
+        {
+            $limit: limit
+        }
+    ]);
+
+    res.status(200)
+        .json(new apiResponse(200, {
+            products,
+            totalBestSellers: products.length
+        }, "Best Sellers Fetched Successfully"))
+})
+
+const getProductsByPriceRange = asyncHandler(async (req, res) => {
+    const limit = Number(req.query.limit) || 10;
+    const fetchingType = req.query.fetchingType?.toLowerCase() || "hightolow";
+
+    const pipeLine = [
+        {
+            $match: {
+                isActive: true
+            }
+        }
+    ];
+
+    if (fetchingType === "hightolow") {
+        pipeLine.push({ $sort: { price: -1 } })
+    } else if (fetchingType === "lowtohigh") {
+        pipeLine.push({ $sort: { price: 1 } });
+    }
+
+    pipeLine.push({
+        $limit: limit
+    });
+
+    const products = await Product.aggregate(pipeLine);
+
+    res.status(200)
+        .json(new apiResponse(200, {
+            products,
+            totalProducts: products.length
+        }, "Product By Price High to Low vice versa Fetched"))
+})
+
+const getLowStockProducts = asyncHandler(async (req, res) => {
+    const limit = Number(req.query.limit) || 10;
+    const stockLimit = Number(req.query.stockLimit) || 10;
+
+    const products = await Product.aggregate([
+        {
+            $match: {
+                isActive: true,
+                stock: { $lt: stockLimit }
+            }
+        },
+        {
+            $sort: { stock: 1 }
+        },
+        {
+            $limit: limit
+        }
+    ]);
+
+    res.status(200)
+        .json(new apiResponse(200, {
+            products,
+            lowerStockProductsCount: products.length
+        }, "Lower Stock Products Fetched Sucessfully"))
 });
 
 export {
@@ -319,5 +425,9 @@ export {
     getProductsByPagination,
     getProductById,
     getProductsByCategory,
-    searchProducts
+    searchProducts,
+    getNewArrivals,
+    getBestSellers,
+    getProductsByPriceRange,
+    getLowStockProducts
 };
