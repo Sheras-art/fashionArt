@@ -41,10 +41,13 @@ const productSchema = new mongoose.Schema({
   },
   rating: {
     type: Number,
-    required: false,
     default: 0,
     min: 0,
     max: 5
+  },
+  buyCount: {
+    type: Number,
+    default: 0
   }
 }, { timestamps: true });
 

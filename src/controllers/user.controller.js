@@ -23,7 +23,7 @@ const generateAccessAndRefreshToken = async (userId) => {
 
         throw new apiError(500, "Something went wrong, While generating Access and Resfresh Token")
     }
-}
+};
 
 const registerUser = asyncHandler(async (req, res) => {
     // user register todo's
@@ -122,7 +122,7 @@ const loginUser = asyncHandler(async (req, res) => {
         },
             "User LoggedIN Successfully"
         ))
-})
+});
 
 const logOutUser = asyncHandler(async (req, res) => {
     const user = req.user;
@@ -140,7 +140,28 @@ const logOutUser = asyncHandler(async (req, res) => {
     res.status(200)
         .clearCookie("refreshToken", options)
         .clearCookie("accessToken", options)
-        .json(new apiResponse(200, {}, "User Logout Successfully"))
+        .json(new apiResponse(200, {email: updatedUser.email}, "User Logout Successfully"))
+});
+
+const deleteUser = asyncHandler(async(req, res)=>{
+    const userId = req.params.id;
+
+    if (!userId) {
+        throw new apiError(400, "User id required!")
+    }
+
+    if(!mongoose.Types.ObjectId.isValid(userId)){
+        throw new apiError(400, "User id not valid")
+    }
+
+    const user = await User.findByIdAndDelete(userId);
+
+    if (!user) {
+        throw new apiError(400, "User not exist or already deleted")
+    }
+
+    res.status(200)
+    .json(new apiResponse(200, {user}, "User deleted successfully"))
 })
 
 const refreshAccessToken = asyncHandler(async (req, res) => {
@@ -176,7 +197,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
             accessToken,
             refreshToken
         }, "Access Token Generated Successfully"))
-})
+});
 
 const changeUserPassword = asyncHandler(async (req, res) => {
     const { oldPassword, newPassword } = req.body;
@@ -202,7 +223,7 @@ const changeUserPassword = asyncHandler(async (req, res) => {
 
     res.status(200)
         .json(new apiResponse(200, {}, "Password changed successfully"))
-})
+});
 
 const editUserDetails = asyncHandler(async (req, res) => {
     // edit user details todo's
@@ -243,6 +264,23 @@ const editUserDetails = asyncHandler(async (req, res) => {
 const getCurrentUser = asyncHandler(async (req, res) => {
     return res.status(200)
         .json(new apiResponse(200, req.user, "Current user fetched successfully"))
+});
+
+const getUserByEmail = asyncHandler(async(req, res)=>{
+    const email = req.body.email;
+
+    if (!email) {
+        throw new apiError(400, "Email required!")
+    }
+
+    const user = await User.findOne({email: email});
+
+    if (!user) {
+        throw new apiError(400, "User not found with this email")
+    }
+
+    res.status(200)
+    .json(new apiResponse(200, {user}, "User fetched Successfully"))
 });
 
 const addUserAddress = asyncHandler(async (req, res) => {
@@ -521,9 +559,11 @@ export {
     registerUser,
     loginUser,
     logOutUser,
+    deleteUser,
     refreshAccessToken,
     changeUserPassword,
     getCurrentUser,
+    getUserByEmail,
     addUserAddress,
     setDefaultUserAddress,
     updateUserAddress,

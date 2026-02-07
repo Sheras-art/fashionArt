@@ -99,14 +99,33 @@ const updateProduct = asyncHandler(async (req, res) => {
     // send response
 
     const { id } = req.params;
-    const { title, category, description, stock, price } = req.body;
+    const { title, category, description, stock, price, buyCount } = req.body;
 
     if (!["admin", "owner"].includes(req.user.role)) {
         throw new apiError(403, "Only admin and owner can update products");
     }
 
-    if ([title, category, description, stock, price].some((field) => field?.toString() === "" || field === undefined)) {
-        throw new apiError(400, "Every fields cannot be empty");
+    const textFields = { title, category, description };
+    for (const [key, value] of Object.entries(textFields)) {
+        if (value !== undefined && typeof value !== "string") {
+            throw new apiError(400, `${key} must be a string`)
+        }
+        if (value.trim() === "") {
+            throw new apiError(400, `${key} must not be empty`)
+        }
+    }
+
+    const numberFields = { stock, price, buyCount };
+
+    for (const [key, value] of Object.entries(numberFields)) {
+        if (value !== undefined) {
+            const num = Number(value);
+
+            if (!Number.isFinite(num)) {
+                throw new apiError(400, `${key} must be a number`)
+            }
+        }
+
     }
 
     const existingProduct = await Product.findById(id);
@@ -115,40 +134,39 @@ const updateProduct = asyncHandler(async (req, res) => {
         throw new apiError(404, "Product not found");
     }
 
-    const coverImageLocalPath = req.files?.coverImage?.[0].path;
-    const imagesLocalPath = req.files?.images?.map((file) => file?.path);
+    if (req.files) {
+        const coverImageLocalPath = req.files?.coverImage?.[0].path;
+        const imagesLocalPath = req.files?.images?.map((file) => file?.path);
 
-    // upload new images to cloudinary if provided
-    if (coverImageLocalPath) {
-        var coverImageOnCloudinary = await uploadOnCloudinary(coverImageLocalPath);
+        // upload new images to cloudinary if provided
+        if (coverImageLocalPath) {
+            var coverImageOnCloudinary = await uploadOnCloudinary(coverImageLocalPath);
+        }
+
+        if (imagesLocalPath?.length) {
+            const imagesOnCloudinary = await Promise.all(
+                imagesLocalPath?.map(async (imagePath) => {
+                    return await uploadOnCloudinary(imagePath)
+                })
+            )
+            var imagesURLs = imagesOnCloudinary.map((img) => img?.url);
+        }
     }
 
-    if (imagesLocalPath) {
-        const imagesOnCloudinary = await Promise.all(
-            imagesLocalPath?.map(async (imagePath) => {
-                return await uploadOnCloudinary(imagePath)
-            })
-        )
-        var imagesURLs = imagesOnCloudinary.map((img) => img?.url);
-    }
-
-    const updateProduct = await Product.findByIdAndUpdate(existingProduct._id, {
-        title: title || existingProduct.title,
-        category: category || existingProduct.category,
-        description: description || existingProduct.description,
+    const product = await Product.findByIdAndUpdate(existingProduct._id, {
+        title: title ?? existingProduct.title,
+        category: category ?? existingProduct.category,
+        description: description ?? existingProduct.description,
         stock: stock !== undefined ? stock : existingProduct.stock,
         price: price !== undefined ? price : existingProduct.price,
         coverImage: coverImageOnCloudinary ? coverImageOnCloudinary.url : existingProduct.coverImage,
-        images: imagesURLs || existingProduct.images
+        images: imagesURLs || existingProduct.images,
+        buyCount: buyCount ?? existingProduct.buyCount
     }, { new: true });
 
-    await updateProduct.save({
-        validateBeforeSave: true
-    });
+    res.status(200).json(new apiResponse(200, { product: product }, "Product updated successfully"));
 
-    res.status(200).json(new apiResponse(200, { product: updateProduct }, "Product updated successfully"));
-
-    console.log(updateProduct, "Product Updated Successfully");
+    console.log(product, "Product Updated Successfully");
 
 });
 
@@ -359,7 +377,7 @@ const getBestSellers = asyncHandler(async (req, res) => {
             products,
             totalBestSellers: products.length
         }, "Best Sellers Fetched Successfully"))
-})
+});
 
 const getProductsByPriceRange = asyncHandler(async (req, res) => {
     const limit = Number(req.query.limit) || 10;
@@ -390,7 +408,7 @@ const getProductsByPriceRange = asyncHandler(async (req, res) => {
             products,
             totalProducts: products.length
         }, "Product By Price High to Low vice versa Fetched"))
-})
+});
 
 const getLowStockProducts = asyncHandler(async (req, res) => {
     const limit = Number(req.query.limit) || 10;
@@ -418,6 +436,72 @@ const getLowStockProducts = asyncHandler(async (req, res) => {
         }, "Lower Stock Products Fetched Sucessfully"))
 });
 
+const getProductStats = asyncHandler(async (req, res) => {
+
+    const productId = req.params.id;
+
+    if (!productId) {
+        throw new apiError(400, "Product id required!")
+    }
+
+    const product = await Product.aggregate([
+        {
+            $match: {
+                _id: new mongoose.Types.ObjectId(productId)
+            }
+        },
+        {
+            $project: {
+                purchases: "$buyCount",
+                totalRevenue: { $multiply: ["$price", "$buyCount"] }
+            }
+        }
+    ])
+
+    if (!product.length) {
+        throw new apiError(400, "Product does not exist with this product id")
+    }
+
+    res.status(200)
+        .json(new apiResponse(200, {
+            product
+        }, "Product Stats fetched Successfully"))
+});
+
+const toggleProductVisibility = asyncHandler(async (req, res) => {
+
+    const productId = req.params.id;
+
+    if (!productId) {
+        throw new apiError(400, "Product id required!")
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+        throw new apiError(400, "Product id not valid!")
+    }
+
+    const product = await Product.findByIdAndUpdate(
+        { _id: productId },
+        [
+            {
+                $set: {
+                    isActive: { $not: "$isActive" }
+                }
+            }
+        ],
+        {
+            new: true,
+            updatePipeline: true
+        }
+    )
+
+    if (!product) {
+        throw new apiError(400, "Product not found")
+    }
+    res.status(200)
+        .json(new apiResponse(200, { product }, `Product ${product.isActive ? "activated" : "deactivated"}`));
+});
+
 export {
     createProduct,
     updateProduct,
@@ -429,5 +513,7 @@ export {
     getNewArrivals,
     getBestSellers,
     getProductsByPriceRange,
-    getLowStockProducts
+    getLowStockProducts,
+    getProductStats,
+    toggleProductVisibility
 };
