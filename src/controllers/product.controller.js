@@ -99,39 +99,40 @@ const updateProduct = asyncHandler(async (req, res) => {
     // send response
 
     const { id } = req.params;
-    const { title, category, description, stock, price, buyCount } = req.body;
+    const { title, category, description, stock, price} = req.body;
 
-    if (!["admin", "owner"].includes(req.user.role)) {
-        throw new apiError(403, "Only admin and owner can update products");
+    const updateFields = {};
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw new apiError(400, "Invalid product ID");
     }
 
-    const textFields = { title, category, description };
-    for (const [key, value] of Object.entries(textFields)) {
-        if (value !== undefined && typeof value !== "string") {
-            throw new apiError(400, `${key} must be a string`)
-        }
-        if (value.trim() === "") {
-            throw new apiError(400, `${key} must not be empty`)
-        }
-    }
-
-    const numberFields = { stock, price, buyCount };
-
-    for (const [key, value] of Object.entries(numberFields)) {
-        if (value !== undefined) {
-            const num = Number(value);
-
-            if (!Number.isFinite(num)) {
-                throw new apiError(400, `${key} must be a number`)
+    if (req.body) {
+        const textFields = { title, category, description };
+        for (const [key, value] of Object.entries(textFields)) {
+            if (value !== undefined) {
+                if (typeof value !== "string") {
+                    throw new apiError(400, `${key} must be a string`)
+                }
+                if (value.trim().length === 0) {
+                    throw new apiError(400, `${key} must not be empty`)
+                }
             }
+            updateFields[key] = value;
         }
 
-    }
+        const numberFields = { stock, price };
 
-    const existingProduct = await Product.findById(id);
+        for (const [key, value] of Object.entries(numberFields)) {
+            if (value !== undefined) {
+                const num = Number(value);
 
-    if (!existingProduct) {
-        throw new apiError(404, "Product not found");
+                if (!Number.isFinite(num)) {
+                    throw new apiError(400, `${key} must be a number`)
+                }
+            }
+            updateFields[key] = value;
+        }
     }
 
     if (req.files) {
@@ -140,7 +141,12 @@ const updateProduct = asyncHandler(async (req, res) => {
 
         // upload new images to cloudinary if provided
         if (coverImageLocalPath) {
-            var coverImageOnCloudinary = await uploadOnCloudinary(coverImageLocalPath);
+            const uploadCoverImage = await uploadOnCloudinary(coverImageLocalPath);
+            if (!uploadCoverImage) {
+                throw new apiError(500, "Cover image upload failed");
+            }
+            const coverImageFinalURL = uploadCoverImage.url;
+            if(coverImageFinalURL) updateFields.coverImage = coverImageFinalURL;
         }
 
         if (imagesLocalPath?.length) {
@@ -149,25 +155,29 @@ const updateProduct = asyncHandler(async (req, res) => {
                     return await uploadOnCloudinary(imagePath)
                 })
             )
-            var imagesURLs = imagesOnCloudinary.map((img) => img?.url);
+            const imagesFinalURLs = imagesOnCloudinary.map((img) => img?.url);
+            if(imagesFinalURLs?.length){
+                updateFields.images = imagesFinalURLs;
+            } 
         }
+    };
+
+    if (Object.keys(updateFields).length === 0) {
+        throw new apiError(400, "No fields provided for update")
     }
 
-    const product = await Product.findByIdAndUpdate(existingProduct._id, {
-        title: title ?? existingProduct.title,
-        category: category ?? existingProduct.category,
-        description: description ?? existingProduct.description,
-        stock: stock !== undefined ? stock : existingProduct.stock,
-        price: price !== undefined ? price : existingProduct.price,
-        coverImage: coverImageOnCloudinary ? coverImageOnCloudinary.url : existingProduct.coverImage,
-        images: imagesURLs || existingProduct.images,
-        buyCount: buyCount ?? existingProduct.buyCount
-    }, { new: true });
+    const product = await Product.findByIdAndUpdate(
+        id,
+        updateFields,
+        { new: true , runValidators: true}
+    );
 
+    if (!product) {
+        throw new apiError(400, "Product not found")
+    }
     res.status(200).json(new apiResponse(200, { product: product }, "Product updated successfully"));
 
     console.log(product, "Product Updated Successfully");
-
 });
 
 const deleteProduct = asyncHandler(async (req, res) => {
@@ -222,7 +232,7 @@ const getProductById = asyncHandler(async (req, res) => {
         throw new apiError(400, "PRoduct id not Valid!")
     }
 
-    const product = await Product.findById(productId).populate("owner");
+    const product = await Product.findById(productId);
 
     if (!product) {
         throw new apiError(400, "Product does not exist")
@@ -379,15 +389,24 @@ const getBestSellers = asyncHandler(async (req, res) => {
         }, "Best Sellers Fetched Successfully"))
 });
 
-const getProductsByPriceRange = asyncHandler(async (req, res) => {
+const getProductsByFilters = asyncHandler(async (req, res) => {
+    const page = Number(req.query.page || 1)
     const limit = Number(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
     const fetchingType = req.query.fetchingType?.toLowerCase() || "hightolow";
+
+    const totalProducts = await Product.countDocuments();
+
+    if (limit > totalProducts) {
+        throw new apiError(400, "Limit is more than products exist")
+    }
 
     const pipeLine = [
         {
             $match: {
                 isActive: true
             }
+
         }
     ];
 
@@ -397,16 +416,22 @@ const getProductsByPriceRange = asyncHandler(async (req, res) => {
         pipeLine.push({ $sort: { price: 1 } });
     }
 
-    pipeLine.push({
-        $limit: limit
-    });
+    pipeLine.push(
+        {
+            $skip: skip
+        },
+        {
+            $limit: limit
+        }
+    );
 
     const products = await Product.aggregate(pipeLine);
 
     res.status(200)
         .json(new apiResponse(200, {
             products,
-            totalProducts: products.length
+            totalProducts: products.length,
+            totalPages: Math.ceil(totalProducts / limit)
         }, "Product By Price High to Low vice versa Fetched"))
 });
 
@@ -502,6 +527,46 @@ const toggleProductVisibility = asyncHandler(async (req, res) => {
         .json(new apiResponse(200, { product }, `Product ${product.isActive ? "activated" : "deactivated"}`));
 });
 
+const getRelatedProducts = asyncHandler(async (req, res) => {
+    const productId = req.params.id;
+    const title = req.query.title;
+    const category = req.query.category;
+    const limit = Number(req.query.limit) || 8;
+
+    if (!category || !title) {
+        throw new apiError(400, "Produt title and category both required!")
+    }
+
+    const relatedProducts = await Product.aggregate([
+        {
+            $match: {
+                category: category,
+                _id: { $ne: new mongoose.Types.ObjectId(productId) },
+                $text: { $search: title }
+            }
+        },
+        {
+            $addFields: {
+                score: { $meta: "textScore" }
+            }
+        },
+        {
+            $sort: {
+                score: -1
+            }
+        },
+        {
+            $limit: limit
+        }
+    ]);
+
+    res.status(200)
+        .json(new apiResponse(200, {
+            relatedProducts,
+            totalProductsFetched: relatedProducts.length
+        }, "Products fetched Successfully"))
+});
+
 export {
     createProduct,
     updateProduct,
@@ -512,8 +577,9 @@ export {
     searchProducts,
     getNewArrivals,
     getBestSellers,
-    getProductsByPriceRange,
+    getProductsByFilters,
     getLowStockProducts,
     getProductStats,
-    toggleProductVisibility
+    toggleProductVisibility,
+    getRelatedProducts
 };

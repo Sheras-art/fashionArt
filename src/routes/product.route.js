@@ -10,18 +10,26 @@ import {
     updateProduct, 
     searchProducts, 
     getNewArrivals, 
-    getProductsByPriceRange,
+    getProductsByFilters,
     getLowStockProducts,
     getBestSellers,
     getProductStats,
-    toggleProductVisibility} from "../controllers/product.controller.js";
+    toggleProductVisibility,
+    getRelatedProducts} from "../controllers/product.controller.js";
 import authorizeRoles from "../middlerwares/authorizeRoles.js";
 
 const productRouter = Router();
 
 // Products routes can be defined here
 
-productRouter.route("/search-products").get(verifyJWT, searchProducts);
+productRouter.route("/search-products").get(searchProducts);
+productRouter.route("/get-products-by-filters").get(getProductsByFilters);
+productRouter.route("/get-products-by-pagination").get(getProductsByPagination);
+productRouter.route("/get-single-product/:productId").get(getProductById);
+productRouter.route("/get-products-by-category").get(getProductsByCategory);
+productRouter.route("/get-new-arrivals").get(getNewArrivals);
+productRouter.route("/get-best-sellers").get(getBestSellers);
+productRouter.route("/get-related-products/:id").get(getRelatedProducts);
 
 // secured routes for products can be added here
 
@@ -36,13 +44,7 @@ productRouter.route("/update-product/:id").post(verifyJWT, authorizeRoles("owner
 ]), updateProduct);
 
 productRouter.route("/delete-product/:productId").delete(verifyJWT, authorizeRoles("owner", "admin"), deleteProduct);
-productRouter.route("/get-products-by-pagination").get(verifyJWT, authorizeRoles("owner", "admin"), getProductsByPagination);
-productRouter.route("/get-single-product/:productId").get(verifyJWT, authorizeRoles("owner", "admin"), getProductById);
-productRouter.route("/get-products-by-category").get(verifyJWT, authorizeRoles("owner", "admin"), getProductsByCategory);
-productRouter.route("/get-new-arrivals").get(verifyJWT, authorizeRoles("owner","admin"), getNewArrivals);
-productRouter.route("/get-products-by-price-range").get(verifyJWT, authorizeRoles("owner", "admin"), getProductsByPriceRange);
 productRouter.route("/get-lower-stock-products").get(verifyJWT, authorizeRoles("owner", "admin"), getLowStockProducts);
-productRouter.route("/get-best-sellers").get(verifyJWT, authorizeRoles("owner", "admin"), getBestSellers);
 productRouter.route("/get-product-stats/:id").get(verifyJWT, authorizeRoles("owner", "admin"), getProductStats);
 productRouter.route("/toggle-product-visibility/:id").post(verifyJWT, authorizeRoles("owner", "admin"), toggleProductVisibility);
 
