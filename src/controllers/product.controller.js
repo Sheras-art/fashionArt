@@ -5,6 +5,8 @@ import { Product } from "../models/product.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import mongoose from "mongoose";
 import { User } from "../models/user.model.js";
+import normalizeString from "../utils/normalizeString.js";
+import StringIntoTitleCase from "../utils/StringIntoTitleCase.js";
 
 const createProduct = asyncHandler(async (req, res) => {
 
@@ -19,7 +21,8 @@ const createProduct = asyncHandler(async (req, res) => {
     // send response
 
 
-    const { title, category, price, description, stock } = req.body;
+    let { title, category } = req.body;
+    const { price, description, stock } = req.body;
 
     const ownerInDB = User.findOne({
         _id: req.user._id,
@@ -31,8 +34,10 @@ const createProduct = asyncHandler(async (req, res) => {
     }
 
     if (!title || !category || !description) {
-        throw new apiError(400, "All fields are required");
+        throw new apiError(400, "All text fields are required");
     }
+
+    title = StringIntoTitleCase(title);
 
     if (price === undefined || stock === undefined || isNaN(price) || isNaN(stock) || price < 0 || stock < 0) {
         throw new apiError(400, "Price and Stock must be valid non-negative numbers");
@@ -73,7 +78,8 @@ const createProduct = asyncHandler(async (req, res) => {
 
     const product = await Product.create({
         title,
-        category,
+        category: StringIntoTitleCase(category),
+        normalizedCategory: normalizeString(category),
         price,
         description,
         stock,
@@ -99,15 +105,24 @@ const updateProduct = asyncHandler(async (req, res) => {
     // send response
 
     const { id } = req.params;
-    const { title, category, description, stock, price} = req.body;
+    const {  description, stock, price} = req.body;
+    let {title, category} = req.body;
 
-    const updateFields = {};
+    const updateFields = {
+
+    };
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
         throw new apiError(400, "Invalid product ID");
     }
 
     if (req.body) {
+        if (title) title = StringIntoTitleCase(title);
+        if(category) category = StringIntoTitleCase(category);
+        if (category) {
+            const normalizedCategory = normalizeString(category);
+            updateFields.normalizedCategory = normalizedCategory;
+        }
         const textFields = { title, category, description };
         for (const [key, value] of Object.entries(textFields)) {
             if (value !== undefined) {
@@ -243,28 +258,30 @@ const getProductById = asyncHandler(async (req, res) => {
 });
 
 const getProductsByCategory = asyncHandler(async (req, res) => {
-    const { productCategory } = req.body;
+    let productCategory = req.params.category;
+    const page = Number(req.query.page) || 1
+    const limit = Number(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
 
     if (!productCategory) {
         throw new apiError(400, "Product cateogory required!")
     }
 
+    // productCategory = normalizeString(productCategory);
+    
+    const totalProductsWithGivenCategory = await Product.countDocuments({normalizedCategory: productCategory});
+    
     const products = await Product.aggregate([
         {
             $match: {
-                category: productCategory
+                normalizedCategory: productCategory
             }
         },
         {
-            $lookup: {
-                from: "users",
-                localField: "owner",
-                foreignField: "_id",
-                as: "ownerDetails"
-            }
+            $skip: skip
         },
         {
-            $unwind: "$ownerDetails"
+           $limit: limit
         },
         {
             $project: {
@@ -276,12 +293,6 @@ const getProductsByCategory = asyncHandler(async (req, res) => {
                 images: 1,
                 coverImage: 1,
                 createdAt: 1,
-                ownerDetails: {
-                    _id: 1,
-                    fullName: 1,
-                    userName: 1,
-                    email: 1
-                }
             }
         }
     ]);
@@ -293,7 +304,9 @@ const getProductsByCategory = asyncHandler(async (req, res) => {
     res.status(200)
         .json(new apiResponse(200, {
             products,
-            totalFilteredProducts: products.length,
+            totProductsInGivenCategory: totalProductsWithGivenCategory,
+            productsFetchedByLimit: products.length,
+            totalPages: Math.ceil(totalProductsWithGivenCategory / limit)
         }, "Products By Category fetched Successfully"))
 });
 

@@ -26,7 +26,7 @@ productRouter.route("/search-products").get(searchProducts);
 productRouter.route("/get-products-by-filters").get(getProductsByFilters);
 productRouter.route("/get-products-by-pagination").get(getProductsByPagination);
 productRouter.route("/get-single-product/:productId").get(getProductById);
-productRouter.route("/get-products-by-category").get(getProductsByCategory);
+productRouter.route("/get-products-by-category/:category").get(getProductsByCategory);
 productRouter.route("/get-new-arrivals").get(getNewArrivals);
 productRouter.route("/get-best-sellers").get(getBestSellers);
 productRouter.route("/get-related-products/:id").get(getRelatedProducts);
