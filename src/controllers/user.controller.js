@@ -5,6 +5,7 @@ import { User } from "../models/user.model.js";
 import { Address } from "../models/address.model.js";
 import { MAX_ADDRESS_PER_USER } from "../constants.js";
 import mongoose from "mongoose";
+import jwt from "jsonwebtoken";
 
 const generateAccessAndRefreshToken = async (userId) => {
     try {
@@ -14,13 +15,11 @@ const generateAccessAndRefreshToken = async (userId) => {
 
         user.refreshToken = refreshToken;
         await user.save({ validateBeforeSave: false });
-        console.log("refresh token saved to data base");
 
         return { accessToken, refreshToken };
 
     } catch (error) {
         console.error(error);
-
         throw new apiError(500, "Something went wrong, While generating Access and Resfresh Token")
     }
 };
@@ -109,7 +108,8 @@ const loginUser = asyncHandler(async (req, res) => {
 
     const options = {
         httpOnly: true,
-        secure: true
+        secure: false,
+        sameSite: "lax"
     }
 
     res.status(200)
@@ -132,25 +132,30 @@ const logOutUser = asyncHandler(async (req, res) => {
         $set: { isActive: false }
     });
 
+    if (!updatedUser) {
+        throw new apiError(500, "Something went wrong while logging-Out")
+    }
+
     const options = {
         httpOnly: true,
-        secure: true
+        secure: false,
+        sameSite: "lax"
     }
 
     res.status(200)
         .clearCookie("refreshToken", options)
         .clearCookie("accessToken", options)
-        .json(new apiResponse(200, {email: updatedUser.email}, "User Logout Successfully"))
+        .json(new apiResponse(200, { email: updatedUser.email }, "User Logout Successfully"))
 });
 
-const deleteUser = asyncHandler(async(req, res)=>{
+const deleteUser = asyncHandler(async (req, res) => {
     const userId = req.params.id;
 
     if (!userId) {
         throw new apiError(400, "User id required!")
     }
 
-    if(!mongoose.Types.ObjectId.isValid(userId)){
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
         throw new apiError(400, "User id not valid")
     }
 
@@ -161,17 +166,22 @@ const deleteUser = asyncHandler(async(req, res)=>{
     }
 
     res.status(200)
-    .json(new apiResponse(200, {user}, "User deleted successfully"))
+        .json(new apiResponse(200, { user }, "User deleted successfully"))
 })
 
 const refreshAccessToken = asyncHandler(async (req, res) => {
-    const incomingToken = req.cookies?.refreshAccessToken || req.body.refreshToken;
+    const incomingToken = req.cookies?.refreshToken;
 
     if (!incomingToken) {
         throw new apiError(400, "Unauthorized Request")
     }
 
-    const decodedToken = jwt.verify(incomingToken, process.env.ACCESS_TOKEN_SECRET);
+    let decodedToken;
+    try {
+        decodedToken = jwt.verify(incomingToken, process.env.REFRESH_TOKEN_SECRET);
+    } catch (err) {
+        res.status(500).json(new apiError(500, "Something went wrong while verifing refresh token", err))
+    }    
 
     const user = await User.findById(decodedToken?._id);
 
@@ -185,9 +195,10 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 
     const { accessToken, refreshToken } = await generateAccessAndRefreshToken(user._id);
 
-    options = {
+    const options = {
         httpOnly: true,
-        secure: true
+        secure: false,
+        sameSite: "lax"
     }
 
     res.status(200)
@@ -196,7 +207,9 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
         .json(new apiResponse(200, {
             accessToken,
             refreshToken
-        }, "Access Token Generated Successfully"))
+        }, "Access Token Generated Successfully"));
+        
+    console.log("Access Token Generated Successfully ✅");
 });
 
 const changeUserPassword = asyncHandler(async (req, res) => {
@@ -266,21 +279,21 @@ const getCurrentUser = asyncHandler(async (req, res) => {
         .json(new apiResponse(200, req.user, "Current user fetched successfully"))
 });
 
-const getUserByEmail = asyncHandler(async(req, res)=>{
+const getUserByEmail = asyncHandler(async (req, res) => {
     const email = req.body.email;
 
     if (!email) {
         throw new apiError(400, "Email required!")
     }
 
-    const user = await User.findOne({email: email});
+    const user = await User.findOne({ email: email });
 
     if (!user) {
         throw new apiError(400, "User not found with this email")
     }
 
     res.status(200)
-    .json(new apiResponse(200, {user}, "User fetched Successfully"))
+        .json(new apiResponse(200, { user }, "User fetched Successfully"))
 });
 
 const addUserAddress = asyncHandler(async (req, res) => {
@@ -505,7 +518,7 @@ const transferOwnership = asyncHandler(async (req, res) => {
 
     const { newOwnerEmail } = req.body;
 
-    const newOwner = await User.findOne({email: newOwnerEmail});
+    const newOwner = await User.findOne({ email: newOwnerEmail });
     if (!newOwner) {
         throw new apiError(400, "User not Found");
     }

@@ -11,6 +11,7 @@ import {
     getUserByEmail, 
     loginUser, 
     logOutUser, 
+    refreshAccessToken, 
     registerUser, 
     setDefaultUserAddress,
     transferOwnership, 
@@ -24,6 +25,7 @@ const userRouter = Router();
 
 userRouter.route("/register").post(registerUser);
 userRouter.route("/login").post(loginUser);
+userRouter.route("/refresh-access-token").post(refreshAccessToken);
 
 // Secured routes for user can be added here
 
