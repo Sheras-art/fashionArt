@@ -395,6 +395,8 @@ const getBestSellers = asyncHandler(async (req, res) => {
         }
     ]);
 
+    console.log(products);
+
     res.status(200)
         .json(new apiResponse(200, {
             products,
