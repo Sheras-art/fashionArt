@@ -16,4 +16,4 @@ collectionsRoutes.route("/all-collections").get(getAllCollections);
 collectionsRoutes.route("/create-collection").post(verifyJWT, authorizeRoles("owner", "admin"),  upload.single("coverImage"), createCollection);
 collectionsRoutes.route("/delete-collection/:id").delete(verifyJWT, authorizeRoles("owner", "admin"), deleteCollection);
 
-export {collectionsRoutes};
+export default collectionsRoutes;

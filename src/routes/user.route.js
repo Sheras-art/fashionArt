@@ -43,4 +43,4 @@ userRouter.route("/set-default-user-address").post(verifyJWT, setDefaultUserAddr
 userRouter.route("/assign-user-role").post(verifyJWT, authorizeRoles("owner"), assignUserRole);
 userRouter.route("/transfer-ownership").post(verifyJWT, authorizeRoles("owner"), transferOwnership);
 
-export { userRouter }
+export default userRouter;

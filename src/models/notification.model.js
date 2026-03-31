@@ -17,7 +17,7 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["order", "promotion", "system", "other"],
+      enum: ["order", "promotion", "system", "product_related", "other"],
       default: "other",
     },
     isRead: {
@@ -27,10 +27,12 @@ const notificationSchema = new mongoose.Schema(
     relatedOrder: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Order",
+      required: false
     },
     relatedProduct: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Product",
+      required: false
     },
     priority: {
       type: String,

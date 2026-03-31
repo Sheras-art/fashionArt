@@ -6,6 +6,7 @@ import { Address } from "../models/address.model.js";
 import { MAX_ADDRESS_PER_USER } from "../constants.js";
 import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
+import { sendNotifications } from "../utils/notifications.js";
 
 const generateAccessAndRefreshToken = async (userId) => {
     try {
@@ -62,10 +63,24 @@ const registerUser = asyncHandler(async (req, res) => {
     if (!createdUser) {
         throw new apiError(500, "Something went wrong, While creating user")
     }
-    console.log(createdUser, "User Registered Successfully✅");
-    return res
-        .status(201)
-        .json(new apiResponse(201, createdUser, "User Registered Successfullt"))
+
+    try {
+        await sendNotifications({
+            userId: user._id,
+            title: "Welcome to FashionArt!",
+            message: `Hi ${user.fullName}, thank you for registering at FashionArt. We're excited to have you on board! Explore our latest collections and enjoy a seamless shopping experience.`,
+            type: "system",
+            priority: "high",
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // Expires in 7 days
+        });
+    } catch (error) {
+        console.log("Notification Error :", error);
+    }
+
+    res.status(201)
+        .json(new apiResponse(201, createdUser, "registered successfully ✅"));
+
+    console.log(createdUser, "User Registered Successfully ✅");
 });
 
 const loginUser = asyncHandler(async (req, res) => {
@@ -79,19 +94,26 @@ const loginUser = asyncHandler(async (req, res) => {
     // after this remove password and refresh token fields from response
     // and also send them to user in cookies
 
-    const { email, userName, password } = req.body
+    const { email, userName, password } = req.body;
+
+    if (!email && !userName && !password) {
+        res.status(400).json(new apiError(400, "Email or username and password are required"))
+        throw new apiError(400, "Email or username and password are required")
+    }
 
     const user = await User.findOne({
         $or: [{ email }, { userName }]
     })
 
     if (!user) {
-        throw new apiError(400, "User not exists")
+        res.status(400).json(new apiError(400, "Inalid user credentials or user not exist"))
+        throw new apiError(400, "Inalid user credentials or user not exist")
     }
 
     const isPasswordValid = await user.isPasswordCorrect(password);
 
     if (!isPasswordValid) {
+        res.status(401).json(new apiError(401, "Invalid user credentials"))
         throw new apiError(401, "Invalid user credentials")
     }
 
@@ -112,6 +134,19 @@ const loginUser = asyncHandler(async (req, res) => {
         sameSite: "lax"
     }
 
+    try {
+        sendNotifications({
+            userId: user._id,
+            title: "Login Alert",
+            message: `Hi ${user.fullName}, we noticed a login to your account. If this was you, you can safely ignore this message. If you suspect any unauthorized access, please change your password immediately and contact our support team.`,
+            type: "system",
+            priority: "high",
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // Expires in 7 days
+        });
+    } catch (error) {
+        console.log("Notification Error :", error);
+    }
+
     res.status(200)
         .cookie("accessToken", accessToken, options)
         .cookie("refreshToken", refreshToken, options)
@@ -120,8 +155,8 @@ const loginUser = asyncHandler(async (req, res) => {
             accessToken,
             refreshToken
         },
-            "User LoggedIN Successfully"
-        ))
+            "Login successful ✅"
+        ));
 });
 
 const logOutUser = asyncHandler(async (req, res) => {
@@ -181,7 +216,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
         decodedToken = jwt.verify(incomingToken, process.env.REFRESH_TOKEN_SECRET);
     } catch (err) {
         res.status(500).json(new apiError(500, "Something went wrong while verifing refresh token", err))
-    }    
+    }
 
     const user = await User.findById(decodedToken?._id);
 
@@ -208,7 +243,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
             accessToken,
             refreshToken
         }, "Access Token Generated Successfully"));
-        
+
     console.log("Access Token Generated Successfully ✅");
 });
 

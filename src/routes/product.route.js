@@ -48,4 +48,4 @@ productRouter.route("/get-lower-stock-products").get(verifyJWT, authorizeRoles("
 productRouter.route("/get-product-stats/:id").get(verifyJWT, authorizeRoles("owner", "admin"), getProductStats);
 productRouter.route("/toggle-product-visibility/:id").post(verifyJWT, authorizeRoles("owner", "admin"), toggleProductVisibility);
 
-export { productRouter };
+export default productRouter;
