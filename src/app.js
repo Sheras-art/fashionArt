@@ -17,10 +17,11 @@ app.use(cookieParser());
 // Routes
 
 import userRouter from "./routes/user.route.js";
-import productRouter  from "./routes/product.route.js";
-import collectionsRoutes  from "./routes/collections.route.js";
+import productRouter from "./routes/product.route.js";
+import collectionsRoutes from "./routes/collections.route.js";
 import cartRouter from "./routes/cart.route.js";
 import notificationsRouter from "./routes/notifications.route.js";
+import contactRouter from "./routes/contactUs.route.js";
 
 // Routes Declaration
 
@@ -29,5 +30,19 @@ app.use("/api/v1/products", productRouter);
 app.use("/api/v1/collections", collectionsRoutes);
 app.use("/api/v1/cart", cartRouter);
 app.use("/api/v1/notifications", notificationsRouter);
+app.use("/api/v1/contactus", contactRouter);
 
+// Gloabal Error MiddleWare
+
+app.use((err, req, res, next) => {
+
+    res.status(err.statuscode || 500).json({
+        success: false,
+        message: err.message,
+        errors: err.errors,
+        data: null
+    })
+    console.log(err.message, err.errors);
+    next();
+})
 export { app };
