@@ -33,7 +33,7 @@ userRouter.route("/logout").post(verifyJWT, logOutUser);
 userRouter.route("/delete/:id").delete(verifyJWT, deleteUser);
 userRouter.route("/change-password").post(verifyJWT, changeUserPassword);
 userRouter.route("/edit-user-details").post(verifyJWT, editUserDetails);
-userRouter.route("/current-user").post(verifyJWT, getCurrentUser);
+userRouter.route("/current-user").get(verifyJWT, getCurrentUser);
 userRouter.route("/get-user-by-email").get(verifyJWT, authorizeRoles("owner", "admin"), getUserByEmail);
 userRouter.route("/add-user-address").post(verifyJWT, addUserAddress);
 userRouter.route("/delete-user-address").post(verifyJWT, deleteUserAddress);

@@ -97,7 +97,7 @@ const loginUser = asyncHandler(async (req, res) => {
     const { email, userName, password } = req.body;
 
     if (!email && !userName && !password) {
-        res.status(400).json(new apiError(400, "Email or username and password are required"))
+        return res.status(400).json(new apiError(400, "Email or username and password are required"))
         throw new apiError(400, "Email or username and password are required")
     }
 
@@ -106,14 +106,14 @@ const loginUser = asyncHandler(async (req, res) => {
     })
 
     if (!user) {
-        res.status(400).json(new apiError(400, "Inalid user credentials or user not exist"))
+        return res.status(400).json(new apiError(400, "Inalid user credentials or user not exist"))
         throw new apiError(400, "Inalid user credentials or user not exist")
     }
 
     const isPasswordValid = await user.isPasswordCorrect(password);
 
     if (!isPasswordValid) {
-        res.status(401).json(new apiError(401, "Invalid user credentials"))
+        return res.status(401).json(new apiError(401, "Invalid user credentials"))
         throw new apiError(401, "Invalid user credentials")
     }
 
@@ -284,7 +284,7 @@ const editUserDetails = asyncHandler(async (req, res) => {
 
     const { fullName, userName, email, phoneNumber } = req.body;
 
-    if ([fullName, userName, email, phoneNumber].some((field) => field?.trim() === "")) {
+    if ([fullName, userName, phoneNumber].some((field) => field?.trim() === "")) {
         throw new apiError(400, "All fields are required")
     }
 
@@ -298,13 +298,13 @@ const editUserDetails = asyncHandler(async (req, res) => {
     }
 
     const updatedUser = await User.findByIdAndUpdate(req.user._id, {
-        fullName,
-        userName: userName.toLowerCase(),
-        email,
-        phoneNumber,
+        fullName: fullName?.trim().replace(/\s+/g, " "),
+        userName: userName?.trim().replace(/\s+/g, "").toLowerCase(),
+        email: email?.trim().toLowerCase(),
+        phoneNumber: phoneNumber?.trim(),
     }, { new: true }).select("-password -refreshToken");
 
-    res.status(200)
+    return res.status(200)
         .json(new apiResponse(200, updatedUser, "User details updated successfully"));
 
 });
