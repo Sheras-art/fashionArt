@@ -341,13 +341,19 @@ const addUserAddress = asyncHandler(async (req, res) => {
 
     const { fullName, phoneNumber, street, city, state, postalCode, country, type, isDefault } = req.body;
 
+    console.log(req.body);
+    
+
     if (!fullName || !phoneNumber || !street || !city || !state || !postalCode || !country) {
-        throw new apiError(400, "(fullName, phoneNumber, street, city, state, postalCode, country) All fields are required")
+        throw new apiError(400, "All fields are required")
     }
 
     const addressesLimit = await Address.countDocuments({ user: req.user._id });
+
+    console.log("addresss limit: ", addressesLimit);
+    
     if (addressesLimit >= MAX_ADDRESS_PER_USER) {
-        throw new apiError(400, "Maximum address limit reached")
+        throw new apiError(400, "Maximum address limit reached");
     }
 
     const userAddress = await Address.create({

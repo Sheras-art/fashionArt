@@ -7,15 +7,44 @@ const orderSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-    products: [
+    items: [
       {
-        product: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
-        quantity: { type: Number, required: true },
-        price: { type: Number, required: true },
-      }
+        product: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Product",
+          required: true,
+        },
+
+        title: {
+          type: String,
+          required: true,
+        },
+
+        coverImage: {
+          type: String,
+          required: true,
+        },
+
+        category: {
+          type: String,
+          required: true,
+        },
+
+        quantity: {
+          type: Number,
+          required: true,
+          min: 1,
+        },
+
+        price: {
+          type: Number,
+          required: true,
+          min: 0,
+        },
+      },
     ],
     shippingAddress: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: String,
       ref: "Address",
       required: true,
     },

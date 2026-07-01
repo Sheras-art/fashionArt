@@ -22,6 +22,7 @@ import collectionsRoutes from "./routes/collections.route.js";
 import cartRouter from "./routes/cart.route.js";
 import notificationsRouter from "./routes/notifications.route.js";
 import contactRouter from "./routes/contactUs.route.js";
+import orderRouter from "./routes/order.route.js";
 
 // Routes Declaration
 
@@ -31,6 +32,7 @@ app.use("/api/v1/collections", collectionsRoutes);
 app.use("/api/v1/cart", cartRouter);
 app.use("/api/v1/notifications", notificationsRouter);
 app.use("/api/v1/contactus", contactRouter);
+app.use("/api/v1/order", orderRouter);
 
 // Gloabal Error MiddleWare
 
