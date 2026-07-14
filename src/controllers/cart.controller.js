@@ -142,7 +142,7 @@ const removeFromCart = asyncHandler(async(req, res)=>{
     await cart.save()
 
     res.status(200)
-    .json(new apiResponse(200, {product}, "Product Deleted Successfully"))
+    .json(new apiResponse(200, {product}, "Product removed from cart successfully"))
 
     console.log(product);
 })
