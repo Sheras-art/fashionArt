@@ -18,6 +18,7 @@ import {
     updateUserAddress } from "../controllers/user.controller.js";
 import { verifyJWT } from "../middlerwares/auth.middleware.js";
 import authorizeRoles from "../middlerwares/authorizeRoles.js";
+import { validateChangePassword } from "../middlerwares/validateChangePassword.js";
 
 const userRouter = Router();
 
@@ -31,7 +32,7 @@ userRouter.route("/refresh-access-token").post(refreshAccessToken);
 
 userRouter.route("/logout").post(verifyJWT, logOutUser);
 userRouter.route("/delete/:id").delete(verifyJWT, deleteUser);
-userRouter.route("/change-password").post(verifyJWT, changeUserPassword);
+userRouter.route("/change-password").post(verifyJWT, validateChangePassword, changeUserPassword);
 userRouter.route("/edit-user-details").post(verifyJWT, editUserDetails);
 userRouter.route("/current-user").get(verifyJWT, getCurrentUser);
 userRouter.route("/get-user-by-email").get(verifyJWT, authorizeRoles("owner", "admin"), getUserByEmail);

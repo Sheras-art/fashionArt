@@ -248,10 +248,14 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 });
 
 const changeUserPassword = asyncHandler(async (req, res) => {
-    const { oldPassword, newPassword } = req.body;
+    const { oldPassword, newPassword, confirmPassword } = req.body;
 
     if (!oldPassword || !newPassword) {
         throw new apiError(400, "All fields are required")
+    }
+
+    if (confirmPassword !== newPassword) {
+        throw new apiError(400, "newPassword and confirmPassword must be same")
     }
 
     const user = await User.findById(req.user._id);
