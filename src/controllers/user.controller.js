@@ -314,15 +314,16 @@ const editUserDetails = asyncHandler(async (req, res) => {
 });
 
 const editUserPreferences = asyncHandler(async (req, res) => {
+    const allowedFields = ["defaultPaymentMethod", "saveCartAcrossDevices"];
 
-    const { defaultPaymentMethod, saveCartAcrossDevices } = req.body;
-
-    const options = ["defaultPaymentMethod", "saveCartAcrossDevices"];
+    if(Object.keys(req.body).length === 0){
+        throw new apiError(400, "At least one preference must be provided for update.");
+    }
 
     const updates = {};
 
     for (const key in req.body) {
-        if (!options.includes(key)) {
+        if (!allowedFields.includes(key)) {
             throw new apiError(400, `Invalid field: ${key}`);
         }
         if (req.body[key] === undefined) {
@@ -344,14 +345,16 @@ const editUserPreferences = asyncHandler(async (req, res) => {
 });
 
 const editUserNotificationPreferences = asyncHandler(async (req, res) => {
-    const { orderUpdates, shippingAddress, stockAlerts, priceDrop, promotionalOffers, newArrivals } = req.body;
+    const allowedFields = ["orderUpdates", "shippingAddress", "stockAlerts", "priceDrop", "promotionalOffers", "newArrivals"];
 
-    const options = ["orderUpdates", "shippingAddress", "stockAlerts", "priceDrop", "promotionalOffers", "newArrivals"];
+    if (Object.keys(req.body).length === 0) {
+        throw new apiError(400, "At least one notification preference must be provided for update.");
+    }
 
     const updates = {};
 
     for (const key in req.body) {
-        if (!options.includes(key)) {
+        if (!allowedFields.includes(key)) {
             throw new apiError(400, `Invalid field: ${key}`);
         }
 
@@ -376,6 +379,42 @@ const editUserNotificationPreferences = asyncHandler(async (req, res) => {
 
     return res.status(200)
         .json(new apiResponse(200, updatedUser, "User notification preferences updated successfully"));
+});
+
+const editUserPrivacySettings = asyncHandler(async (req, res) => {
+    console.log(req.body);
+    
+    const allowedFields = ["personalizedRecommendations", "personalizedPromotions", "saveSearchHistory", "anonymousAnalytics"];
+
+    if(Object.keys(req.body).length === 0){
+        throw new apiError(400, "At least one privacy setting must be provided for update.");
+    }
+
+    const updates = {};
+
+    for (const key in req.body) {
+        if (!allowedFields.includes(key)) {
+            throw new apiError(400, `Invalid field: ${key}`);
+        }
+        if(typeof req.body[key] !== "boolean") {
+            throw new apiError(400, `Invalid value for ${key}. Expected a boolean.`);
+        }
+        if (req.body[key] === undefined) {
+            throw new apiError(400, `Value for ${key} cannot be undefined.`);
+        }
+        updates[`privacy.${key}`] = req.body[key];
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(req.user._id, {
+        $set: updates
+    }, { returnDocument: "after", runValidators: true }).select("-password -refreshToken");
+
+    if (!updatedUser) {
+        throw new apiError(500, "Something went wrong while updating privacy settings");
+    }
+
+    return res.status(200)
+        .json(new apiResponse(200, updatedUser, "User privacy settings updated successfully"));
 });
 
 const getCurrentUser = asyncHandler(async (req, res) => {
@@ -696,5 +735,6 @@ export {
     assignUserRole,
     transferOwnership,
     editUserPreferences,
-    editUserNotificationPreferences
+    editUserNotificationPreferences,
+    editUserPrivacySettings
 };
