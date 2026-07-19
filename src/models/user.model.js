@@ -94,6 +94,24 @@ const userSchema = new Schema(
         default: true
       }
     },
+    privacy: {
+      personalizedRecommendations: {
+        type: Boolean,
+        default: true,
+      },
+      personalizedPromotions: {
+        type: Boolean,
+        default: true,
+      },
+      saveSearchHistory: {
+        type: Boolean,
+        default: true,
+      },
+      anonymousAnalytics: {
+        type: Boolean,
+        default: true,
+      },
+    },
     refreshToken: {
       type: String,
     }

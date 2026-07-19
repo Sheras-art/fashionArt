@@ -8,6 +8,7 @@ import {
     editUserDetails, 
     editUserNotificationPreferences, 
     editUserPreferences, 
+    editUserPrivacySettings, 
     getCurrentUser, 
     getUserAddresses, 
     getUserByEmail, 
@@ -47,4 +48,5 @@ userRouter.route("/assign-user-role").post(verifyJWT, authorizeRoles("owner"), a
 userRouter.route("/transfer-ownership").post(verifyJWT, authorizeRoles("owner"), transferOwnership);
 userRouter.route("/edit-user-preferences").post(verifyJWT, editUserPreferences);
 userRouter.route("/edit-user-notification-preferences").post(verifyJWT, editUserNotificationPreferences);
+userRouter.route("/edit-user-privacy-settings").post(verifyJWT, editUserPrivacySettings);
 export default userRouter;
