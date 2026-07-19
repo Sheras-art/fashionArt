@@ -6,6 +6,8 @@ import {
     deleteUser, 
     deleteUserAddress, 
     editUserDetails, 
+    editUserNotificationPreferences, 
+    editUserPreferences, 
     getCurrentUser, 
     getUserAddresses, 
     getUserByEmail, 
@@ -43,5 +45,6 @@ userRouter.route("/update-user-address").post(verifyJWT, updateUserAddress);
 userRouter.route("/set-default-user-address").post(verifyJWT, setDefaultUserAddress);
 userRouter.route("/assign-user-role").post(verifyJWT, authorizeRoles("owner"), assignUserRole);
 userRouter.route("/transfer-ownership").post(verifyJWT, authorizeRoles("owner"), transferOwnership);
-
+userRouter.route("/edit-user-preferences").post(verifyJWT, editUserPreferences);
+userRouter.route("/edit-user-notification-preferences").post(verifyJWT, editUserNotificationPreferences);
 export default userRouter;

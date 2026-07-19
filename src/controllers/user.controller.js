@@ -313,6 +313,71 @@ const editUserDetails = asyncHandler(async (req, res) => {
 
 });
 
+const editUserPreferences = asyncHandler(async (req, res) => {
+
+    const { defaultPaymentMethod, saveCartAcrossDevices } = req.body;
+
+    const options = ["defaultPaymentMethod", "saveCartAcrossDevices"];
+
+    const updates = {};
+
+    for (const key in req.body) {
+        if (!options.includes(key)) {
+            throw new apiError(400, `Invalid field: ${key}`);
+        }
+        if (req.body[key] === undefined) {
+            throw new apiError(400, `Value for ${key} cannot be undefined.`);
+        }
+        updates[`preferences.${key}`] = req.body[key];
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(req.user._id, {
+        $set: updates
+    }, { returnDocument: "after", runValidators: true }).select("-password -refreshToken");
+
+    if (!updatedUser) {
+        throw new apiError(500, "Something went wrong while updating notification preferences");
+    }
+
+    return res.status(200)
+        .json(new apiResponse(200, updatedUser, "User preferences updated successfully"));
+});
+
+const editUserNotificationPreferences = asyncHandler(async (req, res) => {
+    const { orderUpdates, shippingAddress, stockAlerts, priceDrop, promotionalOffers, newArrivals } = req.body;
+
+    const options = ["orderUpdates", "shippingAddress", "stockAlerts", "priceDrop", "promotionalOffers", "newArrivals"];
+
+    const updates = {};
+
+    for (const key in req.body) {
+        if (!options.includes(key)) {
+            throw new apiError(400, `Invalid field: ${key}`);
+        }
+
+        if (typeof req.body[key] !== "boolean") {
+            throw new apiError(400, `Invalid value for ${key}. Expected a boolean.`);
+        }
+
+        if (req.body[key] === undefined) {
+            throw new apiError(400, `Value for ${key} cannot be undefined.`);
+        }
+
+        updates[`notificationPreferences.${key}`] = req.body[key];
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(req.user._id, {
+        $set: updates
+    }, { returnDocument: "after", runvalidators: true }).select("-password -refreshToken");
+
+    if (!updatedUser) {
+        throw new apiError(500, "Something went wrong while updating notification preferences");
+    }
+
+    return res.status(200)
+        .json(new apiResponse(200, updatedUser, "User notification preferences updated successfully"));
+});
+
 const getCurrentUser = asyncHandler(async (req, res) => {
     return res.status(200)
         .json(new apiResponse(200, req.user, "Current user fetched successfully"))
@@ -346,7 +411,7 @@ const addUserAddress = asyncHandler(async (req, res) => {
     const { fullName, phoneNumber, street, city, state, postalCode, country, type, isDefault } = req.body;
 
     console.log(req.body);
-    
+
 
     if (!fullName || !phoneNumber || !street || !city || !state || !postalCode || !country) {
         throw new apiError(400, "All fields are required")
@@ -355,7 +420,7 @@ const addUserAddress = asyncHandler(async (req, res) => {
     const addressesLimit = await Address.countDocuments({ user: req.user._id });
 
     console.log("addresss limit: ", addressesLimit);
-    
+
     if (addressesLimit >= MAX_ADDRESS_PER_USER) {
         throw new apiError(400, "Maximum address limit reached");
     }
@@ -422,7 +487,7 @@ const setDefaultUserAddress = asyncHandler(async (req, res) => {
     },)
 
     res.status(200)
-        .json(new apiResponse(200, {}, "Default address set successfully"));
+        .json(new apiResponse(200, {}, "Default address updated successfully"));
 });
 
 const updateUserAddress = asyncHandler(async (req, res) => {
@@ -629,5 +694,7 @@ export {
     deleteUserAddress,
     editUserDetails,
     assignUserRole,
-    transferOwnership
+    transferOwnership,
+    editUserPreferences,
+    editUserNotificationPreferences
 };

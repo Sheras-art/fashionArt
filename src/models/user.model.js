@@ -1,6 +1,7 @@
 import mongoose, { Schema } from "mongoose";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { boolean } from "zod";
 
 const userSchema = new Schema(
   {
@@ -49,6 +50,50 @@ const userSchema = new Schema(
       type: Boolean,
       default: true
     },
+    preferences: {
+      defaultPaymentMethod: {
+        type: String,
+        enum: ["Cash On Delivery", "jazzcash", "easypaisa", "card"],
+        default: "Cash On Delivery",
+      },
+
+      saveCartAcrossDevices: {
+        type: Boolean,
+        default: true,
+      },
+    },
+
+    notificationPreferences: {
+      orderUpdates: {
+        type: Boolean,
+        default: true,
+      },
+
+      shippingUpdates: {
+        type: Boolean,
+        default: true,
+      },
+
+      stockAlerts: {
+        type: Boolean,
+        default: true,
+      },
+
+      priceDrop: {
+        type: Boolean,
+        default: true,
+      },
+
+      promotionalOffers: {
+        type: Boolean,
+        default: true,
+      },
+
+      newArrivals: {
+        type: Boolean,
+        default: true
+      }
+    },
     refreshToken: {
       type: String,
     }
@@ -58,7 +103,7 @@ const userSchema = new Schema(
 
 userSchema.pre("save", async function () {
   // checking if password is not modified then we return no need to perform any action like (hashing).
-  if (!this.isModified("password")) return ;
+  if (!this.isModified("password")) return;
   // and if password is modified or new then we will hash the password first then save it in DB.
   this.password = await bcrypt.hash(this.password, 10);
 });
