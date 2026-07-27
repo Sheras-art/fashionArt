@@ -7,6 +7,8 @@ import { MAX_ADDRESS_PER_USER } from "../constants.js";
 import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 import { sendNotifications } from "../utils/notifications.js";
+import { th } from "zod/locales";
+import { stringFormat } from "zod";
 
 const generateAccessAndRefreshToken = async (userId) => {
     try {
@@ -47,21 +49,36 @@ const registerUser = asyncHandler(async (req, res) => {
     })
 
     if (existedUser) {
-        throw new apiError(409, "User with email or username already exist")
+        throw new apiError(409, "User with email or username already exist");
     }
+
+
 
     const user = await User.create({
         fullName,
         userName: userName?.toLowerCase(),
         password,
         email,
-        phoneNumber: phoneNumber ? phoneNumber : ""
+        phoneNumber: phoneNumber ? phoneNumber : "",
     });
 
     const createdUser = await User.findById(user._id).select("-password -refreshToken")
 
     if (!createdUser) {
-        throw new apiError(500, "Something went wrong, While creating user")
+        throw new apiError(500, "User not created, something went wrong");
+    }
+
+    const { accessToken, refreshToken } = await generateAccessAndRefreshToken(createdUser._id);
+
+
+    await User.findByIdAndUpdate(createdUser._id, {
+        $set: { refreshToken: refreshToken, isActive: true }
+    });
+
+    const options = {
+        httpOnly: true,
+        secure: false,
+        sameSite: "lax"
     }
 
     try {
@@ -77,10 +94,14 @@ const registerUser = asyncHandler(async (req, res) => {
         console.log("Notification Error :", error);
     }
 
-    res.status(201)
-        .json(new apiResponse(201, createdUser, "registered successfully ✅"));
-
     console.log(createdUser, "User Registered Successfully ✅");
+
+    return res.status(201)
+        .cookie("accessToken", accessToken, options)
+        .cookie("refreshToken", refreshToken, options)
+        .json(new apiResponse(201, { createdUser }, "registered successfully ✅"));
+
+
 });
 
 const loginUser = asyncHandler(async (req, res) => {
@@ -96,8 +117,7 @@ const loginUser = asyncHandler(async (req, res) => {
 
     const { email, userName, password } = req.body;
 
-    if (!email && !userName && !password) {
-        return res.status(400).json(new apiError(400, "Email or username and password are required"))
+    if ((!email && !userName) || !password) {
         throw new apiError(400, "Email or username and password are required")
     }
 
@@ -106,21 +126,19 @@ const loginUser = asyncHandler(async (req, res) => {
     })
 
     if (!user) {
-        return res.status(400).json(new apiError(400, "Inalid user credentials or user not exist"))
-        throw new apiError(400, "Inalid user credentials or user not exist")
+        throw new apiError(400, "Invalid user credentials or user not exist")
     }
 
     const isPasswordValid = await user.isPasswordCorrect(password);
 
     if (!isPasswordValid) {
-        return res.status(401).json(new apiError(401, "Invalid user credentials"))
         throw new apiError(401, "Invalid user credentials")
     }
 
     const { accessToken, refreshToken } = await generateAccessAndRefreshToken(user._id);
 
     await User.findByIdAndUpdate(user._id, {
-        $set: { isActive: true }
+        $set: { refreshToken: refreshToken, isActive: true }
     });
 
     const loggedInUser = await User.findById(user._id)
@@ -135,7 +153,7 @@ const loginUser = asyncHandler(async (req, res) => {
     }
 
     try {
-        sendNotifications({
+        await sendNotifications({
             userId: user._id,
             title: "Login Alert",
             message: `Hi ${user.fullName}, we noticed a login to your account. If this was you, you can safely ignore this message. If you suspect any unauthorized access, please change your password immediately and contact our support team.`,
@@ -147,13 +165,11 @@ const loginUser = asyncHandler(async (req, res) => {
         console.log("Notification Error :", error);
     }
 
-    res.status(200)
+    return res.status(200)
         .cookie("accessToken", accessToken, options)
         .cookie("refreshToken", refreshToken, options)
         .json(new apiResponse(200, {
             user: loggedInUser,
-            accessToken,
-            refreshToken
         },
             "Login successful ✅"
         ));
@@ -186,6 +202,10 @@ const logOutUser = asyncHandler(async (req, res) => {
 const deleteUser = asyncHandler(async (req, res) => {
     const userId = req.params.id;
 
+    if (userId !== String(req.user._id)) {
+        throw new apiError(403, "You are not authorized to delete this user")
+    }
+
     if (!userId) {
         throw new apiError(400, "User id required!")
     }
@@ -197,7 +217,7 @@ const deleteUser = asyncHandler(async (req, res) => {
     const user = await User.findByIdAndDelete(userId);
 
     if (!user) {
-        throw new apiError(400, "User not exist or already deleted")
+        throw new apiError(400, "User account not exist or already deleted")
     }
 
     res.status(200)
@@ -316,7 +336,7 @@ const editUserDetails = asyncHandler(async (req, res) => {
 const editUserPreferences = asyncHandler(async (req, res) => {
     const allowedFields = ["defaultPaymentMethod", "saveCartAcrossDevices"];
 
-    if(Object.keys(req.body).length === 0){
+    if (Object.keys(req.body).length === 0) {
         throw new apiError(400, "At least one preference must be provided for update.");
     }
 
@@ -383,10 +403,10 @@ const editUserNotificationPreferences = asyncHandler(async (req, res) => {
 
 const editUserPrivacySettings = asyncHandler(async (req, res) => {
     console.log(req.body);
-    
+
     const allowedFields = ["personalizedRecommendations", "personalizedPromotions", "saveSearchHistory", "anonymousAnalytics"];
 
-    if(Object.keys(req.body).length === 0){
+    if (Object.keys(req.body).length === 0) {
         throw new apiError(400, "At least one privacy setting must be provided for update.");
     }
 
@@ -396,7 +416,7 @@ const editUserPrivacySettings = asyncHandler(async (req, res) => {
         if (!allowedFields.includes(key)) {
             throw new apiError(400, `Invalid field: ${key}`);
         }
-        if(typeof req.body[key] !== "boolean") {
+        if (typeof req.body[key] !== "boolean") {
             throw new apiError(400, `Invalid value for ${key}. Expected a boolean.`);
         }
         if (req.body[key] === undefined) {

@@ -1,40 +1,42 @@
 import { Router } from "express";
-import { 
-    addUserAddress, 
-    assignUserRole, 
-    changeUserPassword, 
-    deleteUser, 
-    deleteUserAddress, 
-    editUserDetails, 
-    editUserNotificationPreferences, 
-    editUserPreferences, 
-    editUserPrivacySettings, 
-    getCurrentUser, 
-    getUserAddresses, 
-    getUserByEmail, 
-    loginUser, 
-    logOutUser, 
-    refreshAccessToken, 
-    registerUser, 
+import {
+    addUserAddress,
+    assignUserRole,
+    changeUserPassword,
+    deleteUser,
+    deleteUserAddress,
+    editUserDetails,
+    editUserNotificationPreferences,
+    editUserPreferences,
+    editUserPrivacySettings,
+    getCurrentUser,
+    getUserAddresses,
+    getUserByEmail,
+    loginUser,
+    logOutUser,
+    refreshAccessToken,
+    registerUser,
     setDefaultUserAddress,
-    transferOwnership, 
-    updateUserAddress } from "../controllers/user.controller.js";
+    transferOwnership,
+    updateUserAddress
+} from "../controllers/user.controller.js";
 import { verifyJWT } from "../middlerwares/auth.middleware.js";
 import authorizeRoles from "../middlerwares/authorizeRoles.js";
 import { validateChangePassword } from "../middlerwares/validateChangePassword.js";
+import validateRegisterUser from "../middlerwares/validateRegisterUser.js";
 
 const userRouter = Router();
 
 // Routes for user can be added here
 
-userRouter.route("/register").post(registerUser);
+userRouter.route("/register").post(validateRegisterUser, registerUser);
 userRouter.route("/login").post(loginUser);
 userRouter.route("/refresh-access-token").post(refreshAccessToken);
 
 // Secured routes for user can be added here
 
 userRouter.route("/logout").post(verifyJWT, logOutUser);
-userRouter.route("/delete/:id").delete(verifyJWT, deleteUser);
+userRouter.route("/delete-user/:id").delete(verifyJWT, deleteUser);
 userRouter.route("/change-password").post(verifyJWT, validateChangePassword, changeUserPassword);
 userRouter.route("/edit-user-details").post(verifyJWT, editUserDetails);
 userRouter.route("/current-user").get(verifyJWT, getCurrentUser);
